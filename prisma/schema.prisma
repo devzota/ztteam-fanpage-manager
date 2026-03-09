@@ -1,0 +1,20 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma/client"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model ZTTeamFanpage {
+  id          String   @id @default(cuid())
+  url         String   @unique
+  name        String
+  description String?
+  imageUrl    String?
+  category    String?
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

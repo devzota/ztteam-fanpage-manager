@@ -9,9 +9,17 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@prisma/adapter-better-sqlite3": "^7.4.2",
+    "@prisma/client": "^7.4.2",
+    "better-sqlite3": "^12.6.2",
+    "cheerio": "^1.2.0",
+    "material-symbols": "^0.40.2",
     "next": "16.1.6",
+    "open-graph-scraper": "^6.11.0",
+    "prisma": "^7.4.2",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
