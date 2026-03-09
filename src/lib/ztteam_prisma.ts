@@ -1,14 +1,14 @@
 import { PrismaClient } from "../generated/prisma/client/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-/** Singleton Prisma Client để tránh tạo nhiều connection trong dev */
+/** Singleton Prisma Client cho PostgreSQL (Neon) */
 const ztteam_globalForPrisma = globalThis as unknown as {
   ztteam_prisma: PrismaClient | undefined;
 };
 
 function ztteam_createPrismaClient(): PrismaClient {
-  const adapter = new PrismaBetterSqlite3({
-    url: process.env.DATABASE_URL || "file:./dev.db",
+  const adapter = new PrismaPg({
+    connectionString: process.env.DATABASE_URL,
   });
   return new PrismaClient({ adapter });
 }
