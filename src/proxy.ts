@@ -4,7 +4,7 @@ import { ztteam_verifyToken } from "@/lib/ztteam_auth";
 /** Các path không cần auth */
 const ZTTEAM_PUBLIC_PATHS = ["/login", "/api/ztteam-auth/login"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   /** Cho phép truy cập public paths */
