@@ -7,6 +7,7 @@ interface ZTTeamScrapeResult {
   name: string;
   description: string | null;
   imageUrl: string | null;
+  pageId: string | null;
   url: string;
 }
 
@@ -29,6 +30,29 @@ const ZTTEAM_BROWSER_HEADERS: Record<string, string> = {
   "Sec-Fetch-User": "?1",
   "Upgrade-Insecure-Requests": "1",
 };
+
+/** Trích xuất Page ID từ HTML */
+function ztteam_extractPageId(html: string): string | null {
+  /** Tìm page_id trong meta tags hoặc script data */
+  const patterns = [
+    /\"pageID\":\"(\d+)\"/,
+    /\"page_id\":\"(\d+)\"/,
+    /fb:\/\/page\/(\d+)/,
+    /content=\"fb:\/\/page\/(\d+)\"/,
+    /\"entity_id\":\"(\d+)\"/,
+    /al:android:url\" content=\"fb:\/\/page\/(\d+)\"/,
+    /al:ios:url\" content=\"fb:\/\/page\/(\d+)\"/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
+}
 
 /** Scrape OG metadata từ Facebook page URL bằng fetch + cheerio */
 async function ztteam_scrapePageInfo(
@@ -63,6 +87,14 @@ async function ztteam_scrapePageInfo(
     $('meta[name="og:image"]').attr("content") ||
     "";
 
+  /** Lấy Page ID từ app link meta tags hoặc HTML */
+  const appLinkPageId =
+    $('meta[property="al:android:url"]').attr("content")?.match(/fb:\/\/page\/(\d+)/)?.[1] ||
+    $('meta[property="al:ios:url"]').attr("content")?.match(/fb:\/\/page\/(\d+)/)?.[1] ||
+    null;
+
+  const pageId = appLinkPageId || ztteam_extractPageId(html);
+
   /** Fallback: lấy từ title tag */
   const pageTitle = $("title").text().trim();
 
@@ -76,6 +108,7 @@ async function ztteam_scrapePageInfo(
     name,
     description: ogDescription || null,
     imageUrl: ogImage || null,
+    pageId,
     url,
   };
 }

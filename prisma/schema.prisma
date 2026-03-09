@@ -13,6 +13,7 @@ model ZTTeamFanpage {
   name        String
   description String?
   imageUrl    String?
+  pageId      String?
   category    String?
   status      String   @default("active")
   createdAt   DateTime @default(now())

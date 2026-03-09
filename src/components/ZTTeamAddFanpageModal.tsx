@@ -12,6 +12,7 @@ interface ZTTeamAddFanpageModalProps {
     name: string;
     description: string | null;
     imageUrl: string | null;
+    pageId: string | null;
     category: string | null;
   }) => Promise<boolean>;
 }
@@ -51,6 +52,7 @@ export default function ZTTeamAddFanpageModal({
       name: ztteam_preview.name,
       description: ztteam_preview.description,
       imageUrl: ztteam_preview.imageUrl,
+      pageId: ztteam_preview.pageId,
       category: null,
     });
     if (success) {

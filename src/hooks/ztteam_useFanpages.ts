@@ -9,6 +9,7 @@ export interface ZTTeamFanpage {
   name: string;
   description: string | null;
   imageUrl: string | null;
+  pageId: string | null;
   category: string | null;
   status: string;
   createdAt: string;
@@ -19,6 +20,7 @@ export interface ZTTeamScrapeData {
   name: string;
   description: string | null;
   imageUrl: string | null;
+  pageId: string | null;
   url: string;
 }
 

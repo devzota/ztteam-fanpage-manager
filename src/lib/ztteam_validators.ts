@@ -30,5 +30,6 @@ export const ztteam_CreateFanpageSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().nullable().optional(),
   imageUrl: z.string().url().nullable().optional(),
+  pageId: z.string().nullable().optional(),
   category: z.string().nullable().optional(),
 });

@@ -9,6 +9,36 @@ interface ZTTeamFanpageTableProps {
   ztteam_onDelete: (id: string) => void;
 }
 
+/** Tạo deep link để mở trong FB app trên mobile */
+function ztteam_getFacebookLink(page: ZTTeamFanpage): string {
+  if (page.pageId) {
+    return `fb://page/${page.pageId}`;
+  }
+  return page.url;
+}
+
+/** Handler mở link — thử deep link trước, fallback về URL web */
+function ztteam_handleOpenPage(page: ZTTeamFanpage) {
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  if (isMobile && page.pageId) {
+    const deepLink = ztteam_getFacebookLink(page);
+    const webUrl = page.url;
+
+    /** Thử mở deep link, nếu không được thì fallback */
+    const timeout = setTimeout(() => {
+      window.open(webUrl, "_blank");
+    }, 1500);
+
+    window.location.href = deepLink;
+
+    /** Nếu app mở thành công, clear timeout */
+    window.addEventListener("blur", () => clearTimeout(timeout), { once: true });
+  } else {
+    window.open(page.url, "_blank");
+  }
+}
+
 /** Bảng danh sách fanpage - responsive */
 export default function ZTTeamFanpageTable({
   ztteam_fanpages,
@@ -108,9 +138,12 @@ export default function ZTTeamFanpageTable({
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right space-x-3">
-                    <a href={ztteam_page.url} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-primary transition-colors">
+                    <button
+                      onClick={() => ztteam_handleOpenPage(ztteam_page)}
+                      className="text-slate-400 hover:text-primary transition-colors"
+                    >
                       <span className="material-symbols-outlined text-xl">visibility</span>
-                    </a>
+                    </button>
                     <button onClick={() => ztteam_onDelete(ztteam_page.id)} className="text-slate-400 hover:text-rose-500 transition-colors">
                       <span className="material-symbols-outlined text-xl">delete</span>
                     </button>
@@ -167,9 +200,12 @@ export default function ZTTeamFanpageTable({
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <a href={ztteam_page.url} target="_blank" rel="noopener noreferrer" className="size-9 flex items-center justify-center rounded-lg text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                  <button
+                    onClick={() => ztteam_handleOpenPage(ztteam_page)}
+                    className="size-9 flex items-center justify-center rounded-lg text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  >
                     <span className="material-symbols-outlined text-xl">visibility</span>
-                  </a>
+                  </button>
                   <button onClick={() => ztteam_onDelete(ztteam_page.id)} className="size-9 flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
                     <span className="material-symbols-outlined text-xl">delete</span>
                   </button>
