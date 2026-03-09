@@ -13,6 +13,7 @@
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
     "cheerio": "^1.2.0",
+    "jose": "^6.2.0",
     "material-symbols": "^0.40.2",
     "next": "16.1.6",
     "open-graph-scraper": "^6.11.0",
