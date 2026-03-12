@@ -27,7 +27,9 @@ export default function ZTTeamAddFanpageModal({
   const [ztteam_url, setZTTeamUrl] = useState("");
   const [ztteam_scraping, setZTTeamScraping] = useState(false);
   const [ztteam_saving, setZTTeamSaving] = useState(false);
-  const [ztteam_preview, setZTTeamPreview] = useState<ZTTeamScrapeData | null>(null);
+  const [ztteam_preview, setZTTeamPreview] = useState<ZTTeamScrapeData | null>(
+    null,
+  );
   const [ztteam_error, setZTTeamError] = useState<string | null>(null);
 
   const ztteam_handleScrape = async () => {
@@ -111,9 +113,13 @@ export default function ZTTeamAddFanpageModal({
                 className="px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {ztteam_scraping ? (
-                  <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+                  <span className="material-symbols-outlined animate-spin text-lg">
+                    progress_activity
+                  </span>
                 ) : (
-                  <span className="material-symbols-outlined text-lg">search</span>
+                  <span className="material-symbols-outlined text-lg">
+                    search
+                  </span>
                 )}
                 Fetch
               </button>
@@ -122,7 +128,9 @@ export default function ZTTeamAddFanpageModal({
 
           {ztteam_error && (
             <div className="p-3 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 rounded-lg">
-              <p className="text-sm text-rose-600 dark:text-rose-400">{ztteam_error}</p>
+              <p className="text-sm text-rose-600 dark:text-rose-400">
+                {ztteam_error}
+              </p>
             </div>
           )}
 
@@ -137,7 +145,9 @@ export default function ZTTeamAddFanpageModal({
                   />
                 ) : (
                   <div className="size-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-primary">flag</span>
+                    <span className="material-symbols-outlined text-primary">
+                      flag
+                    </span>
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
@@ -155,8 +165,12 @@ export default function ZTTeamAddFanpageModal({
                 </p>
               )}
               <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                <span className="material-symbols-outlined text-sm">check_circle</span>
-                <p className="text-xs font-semibold">Page info fetched successfully</p>
+                <span className="material-symbols-outlined text-sm">
+                  check_circle
+                </span>
+                <p className="text-xs font-semibold">
+                  Page info fetched successfully
+                </p>
               </div>
             </div>
           )}
@@ -175,7 +189,9 @@ export default function ZTTeamAddFanpageModal({
             className="px-4 py-2.5 sm:py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {ztteam_saving ? (
-              <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+              <span className="material-symbols-outlined animate-spin text-lg">
+                progress_activity
+              </span>
             ) : (
               <span className="material-symbols-outlined text-lg">save</span>
             )}

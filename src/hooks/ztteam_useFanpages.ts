@@ -2,20 +2,21 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-/** Interface cho dữ liệu Fanpage */
+/** Interface Fanpage */
 export interface ZTTeamFanpage {
   id: string;
   url: string;
   name: string;
   description: string | null;
   imageUrl: string | null;
-  pageId: string | null;
   category: string | null;
+  pageId: string | null;
   status: string;
   createdAt: string;
+  updatedAt: string;
 }
 
-/** Interface cho kết quả scrape */
+/** Interface dữ liệu scrape */
 export interface ZTTeamScrapeData {
   name: string;
   description: string | null;
@@ -24,75 +25,110 @@ export interface ZTTeamScrapeData {
   url: string;
 }
 
+/** Custom hook quản lý fanpages */
 export function ztteam_useFanpages() {
-  const [ztteam_fanpages, setZTTeamFanpages] = useState<ZTTeamFanpage[]>([]);
-  const [ztteam_loading, setZTTeamLoading] = useState(true);
-  const [ztteam_error, setZTTeamError] = useState<string | null>(null);
+  const [ztteam_fanpages, ztteam_setFanpages] = useState<ZTTeamFanpage[]>([]);
+  const [ztteam_loading, ztteam_setLoading] = useState(true);
+  const [ztteam_error, ztteam_setError] = useState<string | null>(null);
 
-  /** Fetch tất cả fanpage từ API */
+  /** Lấy danh sách fanpages */
   const ztteam_fetchFanpages = useCallback(async () => {
     try {
-      setZTTeamLoading(true);
+      ztteam_setLoading(true);
+      ztteam_setError(null);
+
       const res = await fetch("/api/ztteam-fanpage");
       const data = await res.json();
 
       if (data.success) {
-        setZTTeamFanpages(data.data);
+        ztteam_setFanpages(data.data);
       } else {
-        setZTTeamError(data.error);
+        ztteam_setError(data.error || "Failed to fetch fanpages");
       }
     } catch {
-      setZTTeamError("Failed to fetch fanpages");
+      ztteam_setError("Network error. Please try again.");
     } finally {
-      setZTTeamLoading(false);
+      ztteam_setLoading(false);
     }
   }, []);
 
-  /** Scrape thông tin từ Facebook URL */
+  /** Scrape thông tin fanpage từ URL */
   const ztteam_scrapePage = async (
-    url: string
+    url: string,
   ): Promise<ZTTeamScrapeData | null> => {
     try {
-      setZTTeamError(null);
+      ztteam_setError(null);
+
       const res = await fetch("/api/ztteam-fanpage/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
+
       const data = await res.json();
 
       if (data.success) {
         return data.data;
+      } else {
+        ztteam_setError(data.error || "Failed to scrape page info");
+        return null;
       }
-      setZTTeamError(data.error);
-      return null;
     } catch {
-      setZTTeamError("Failed to scrape page info");
+      ztteam_setError("Failed to fetch page info. Please check the URL.");
       return null;
     }
   };
 
   /** Thêm fanpage mới */
   const ztteam_addFanpage = async (
-    pageData: Omit<ZTTeamFanpage, "id" | "status" | "createdAt">
+    pageData: Omit<ZTTeamScrapeData, ""> & { category?: string },
   ): Promise<boolean> => {
     try {
-      setZTTeamError(null);
+      ztteam_setError(null);
+
       const res = await fetch("/api/ztteam-fanpage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(pageData),
       });
+
       const data = await res.json();
 
       if (data.success) {
         await ztteam_fetchFanpages();
         return true;
+      } else {
+        ztteam_setError(data.error || "Failed to add fanpage");
+        return false;
       }
-      setZTTeamError(data.error);
-      return false;
     } catch {
-      setZTTeamError("Failed to add fanpage");
+      ztteam_setError("Network error. Please try again.");
+      return false;
+    }
+  };
+
+  /** Scrape lại (refresh) thông tin fanpage */
+  const ztteam_refreshFanpage = async (id: string): Promise<boolean> => {
+    try {
+      ztteam_setError(null);
+
+      const res = await fetch("/api/ztteam-fanpage", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        await ztteam_fetchFanpages();
+        return true;
+      } else {
+        ztteam_setError(data.error || "Failed to refresh fanpage");
+        return false;
+      }
+    } catch {
+      ztteam_setError("Network error. Please try again.");
       return false;
     }
   };
@@ -100,24 +136,28 @@ export function ztteam_useFanpages() {
   /** Xóa fanpage */
   const ztteam_deleteFanpage = async (id: string): Promise<boolean> => {
     try {
-      setZTTeamError(null);
+      ztteam_setError(null);
+
       const res = await fetch(`/api/ztteam-fanpage?id=${id}`, {
         method: "DELETE",
       });
+
       const data = await res.json();
 
       if (data.success) {
         await ztteam_fetchFanpages();
         return true;
+      } else {
+        ztteam_setError(data.error || "Failed to delete fanpage");
+        return false;
       }
-      setZTTeamError(data.error);
-      return false;
     } catch {
-      setZTTeamError("Failed to delete fanpage");
+      ztteam_setError("Network error. Please try again.");
       return false;
     }
   };
 
+  /** Fetch khi mount */
   useEffect(() => {
     ztteam_fetchFanpages();
   }, [ztteam_fetchFanpages]);
@@ -126,10 +166,11 @@ export function ztteam_useFanpages() {
     ztteam_fanpages,
     ztteam_loading,
     ztteam_error,
+    ztteam_setError,
+    ztteam_fetchFanpages,
     ztteam_scrapePage,
     ztteam_addFanpage,
+    ztteam_refreshFanpage,
     ztteam_deleteFanpage,
-    ztteam_fetchFanpages,
-    setZTTeamError,
   };
 }

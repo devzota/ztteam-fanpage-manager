@@ -1,226 +1,336 @@
 "use client";
 
+import { useState } from "react";
 import { ZTTeamFanpage } from "@/hooks/ztteam_useFanpages";
 
 interface ZTTeamFanpageTableProps {
   ztteam_fanpages: ZTTeamFanpage[];
   ztteam_loading: boolean;
-  ztteam_onAddClick: () => void;
   ztteam_onDelete: (id: string) => void;
+  ztteam_onRefresh: (id: string) => Promise<boolean>;
 }
 
-/** Tạo deep link để mở trong FB app trên mobile */
-function ztteam_getFacebookLink(page: ZTTeamFanpage): string {
-  if (page.pageId) {
-    return `fb://page/${page.pageId}`;
-  }
-  return page.url;
+/** Detect mobile device */
+function ztteam_isMobile(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent,
+  );
 }
 
-/** Handler mở link — thử deep link trước, fallback về URL web */
-function ztteam_handleOpenPage(page: ZTTeamFanpage) {
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+/** Mở Facebook page - xử lý deep link cho mobile */
+function ztteam_handleOpenPage(fanpage: ZTTeamFanpage) {
+  const mobile = ztteam_isMobile();
 
-  if (isMobile && page.pageId) {
-    const deepLink = ztteam_getFacebookLink(page);
-    const webUrl = page.url;
+  if (mobile && fanpage.pageId) {
+    /**
+     * Trên mobile: dùng thẻ <a> ẩn với deep link
+     * Click programmatically - an toàn, không đóng tab
+     */
+    const fbAppUrl = `fb://page/${fanpage.pageId}`;
+    const link = document.createElement("a");
+    link.href = fbAppUrl;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
 
-    /** Thử mở deep link, nếu không được thì fallback */
-    const timeout = setTimeout(() => {
-      window.open(webUrl, "_blank");
+    /**
+     * Fallback: nếu sau 1.5s vẫn ở trang hiện tại
+     * (app FB không bắt được) → mở URL bình thường
+     */
+    const fallbackTimer = setTimeout(() => {
+      window.location.href = fanpage.url;
     }, 1500);
 
-    window.location.href = deepLink;
+    /** Nếu page bị blur (app FB đã mở) → clear fallback */
+    const handleBlur = () => {
+      clearTimeout(fallbackTimer);
+      window.removeEventListener("blur", handleBlur);
+    };
+    window.addEventListener("blur", handleBlur);
 
-    /** Nếu app mở thành công, clear timeout */
-    window.addEventListener("blur", () => clearTimeout(timeout), { once: true });
+    /** Cleanup link element */
+    setTimeout(() => {
+      if (link.parentNode) {
+        document.body.removeChild(link);
+      }
+    }, 100);
   } else {
-    window.open(page.url, "_blank");
+    /** Desktop hoặc không có pageId: mở tab mới */
+    window.open(fanpage.url, "_blank", "noopener,noreferrer");
   }
 }
 
-/** Bảng danh sách fanpage - responsive */
 export default function ZTTeamFanpageTable({
   ztteam_fanpages,
   ztteam_loading,
-  ztteam_onAddClick,
   ztteam_onDelete,
+  ztteam_onRefresh,
 }: ZTTeamFanpageTableProps) {
-  return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-      <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h3 className="text-lg font-bold">Recent Fanpages</h3>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button className="flex-1 sm:flex-none px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
-            <span className="material-symbols-outlined text-lg">filter_list</span>
-            <span className="hidden sm:inline">Filter</span>
-          </button>
-          <button
-            onClick={ztteam_onAddClick}
-            className="flex-1 sm:flex-none px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors"
-          >
-            <span className="material-symbols-outlined text-lg">add</span>
-            New Fanpage
-          </button>
+  const [ztteam_refreshingId, ztteam_setRefreshingId] = useState<string | null>(
+    null,
+  );
+
+  /** Xử lý refresh fanpage */
+  const handleRefresh = async (id: string) => {
+    ztteam_setRefreshingId(id);
+    await ztteam_onRefresh(id);
+    ztteam_setRefreshingId(null);
+  };
+
+  /** Loading state */
+  if (ztteam_loading) {
+    return (
+      <div className="bg-white dark:bg-slate-800 rounded-2xl p-8">
+        <div className="flex items-center justify-center gap-3 text-slate-500">
+          <span className="material-symbols-outlined animate-spin">
+            progress_activity
+          </span>
+          <span>Loading fanpages...</span>
         </div>
       </div>
+    );
+  }
 
-      {/** Desktop: Table view */}
-      <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full text-left">
+  /** Empty state */
+  if (ztteam_fanpages.length === 0) {
+    return (
+      <div className="bg-white dark:bg-slate-800 rounded-2xl p-12 text-center">
+        <span className="material-symbols-outlined text-6xl text-slate-300 dark:text-slate-600 mb-4 block">
+          language
+        </span>
+        <h3 className="text-lg font-semibold text-slate-600 dark:text-slate-300 mb-2">
+          No fanpages yet
+        </h3>
+        <p className="text-slate-400 dark:text-slate-500">
+          Click &quot;New Fanpage&quot; to add your first page
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/** === DESKTOP TABLE === */}
+      <div className="hidden sm:block bg-white dark:bg-slate-800 rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+            Recent Fanpages
+          </h3>
+        </div>
+
+        <table className="w-full">
           <thead>
-            <tr className="bg-slate-50 dark:bg-slate-800/50">
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Fanpage Name
-              </th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Category
-              </th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">
-                Actions
-              </th>
+            <tr className="text-left text-sm text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-700">
+              <th className="px-6 py-3 font-medium">Page Name</th>
+              <th className="px-6 py-3 font-medium">Page ID</th>
+              <th className="px-6 py-3 font-medium">Status</th>
+              <th className="px-6 py-3 font-medium text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-            {ztteam_loading ? (
-              <tr>
-                <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
-                  <span className="material-symbols-outlined animate-spin text-3xl text-primary">progress_activity</span>
-                  <p className="mt-2 text-sm">Loading fanpages...</p>
-                </td>
-              </tr>
-            ) : ztteam_fanpages.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
-                  <span className="material-symbols-outlined text-4xl text-slate-300 dark:text-slate-600">flag</span>
-                  <p className="mt-2 text-sm">No fanpages yet. Click &quot;New Fanpage&quot; to add one.</p>
-                </td>
-              </tr>
-            ) : (
-              ztteam_fanpages.map((ztteam_page) => (
-                <tr
-                  key={ztteam_page.id}
-                  className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-3">
-                      {ztteam_page.imageUrl ? (
-                        <img
-                          src={ztteam_page.imageUrl}
-                          alt={ztteam_page.name}
-                          className="size-10 rounded-lg object-cover border border-slate-200 dark:border-slate-700"
-                        />
-                      ) : (
-                        <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-primary">flag</span>
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-sm font-bold">{ztteam_page.name}</p>
-                        <p className="text-xs text-slate-500 truncate max-w-[200px]">{ztteam_page.url}</p>
+          <tbody>
+            {ztteam_fanpages.map((fanpage) => (
+              <tr
+                key={fanpage.id}
+                className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+              >
+                {/** Page Name + Avatar */}
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    {fanpage.imageUrl ? (
+                      <img
+                        src={fanpage.imageUrl}
+                        alt={fanpage.name}
+                        className="w-10 h-10 rounded-full object-cover ring-2 ring-slate-100 dark:ring-slate-600"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-primary text-lg">
+                          language
+                        </span>
                       </div>
+                    )}
+                    <div>
+                      <p className="font-medium text-slate-800 dark:text-slate-100">
+                        {fanpage.name}
+                      </p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[200px]">
+                        {fanpage.url}
+                      </p>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] font-bold uppercase tracking-wider">
-                      {ztteam_page.category || "Uncategorized"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <span className={`size-2 rounded-full ${ztteam_page.status === "active" ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`}></span>
-                      <span className={`text-sm font-medium ${ztteam_page.status === "active" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-500 dark:text-slate-400"}`}>
-                        {ztteam_page.status === "active" ? "Active" : "Inactive"}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right space-x-3">
+                  </div>
+                </td>
+
+                {/** Page ID */}
+                <td className="px-6 py-4">
+                  <span className="text-sm text-slate-500 dark:text-slate-400 font-mono">
+                    {fanpage.pageId || "N/A"}
+                  </span>
+                </td>
+
+                {/** Status */}
+                <td className="px-6 py-4">
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                      fanpage.status === "active"
+                        ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
+                        : "bg-slate-100 text-slate-600 dark:bg-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        fanpage.status === "active"
+                          ? "bg-emerald-500"
+                          : "bg-slate-400"
+                      }`}
+                    ></span>
+                    {fanpage.status === "active" ? "Active" : "Inactive"}
+                  </span>
+                </td>
+
+                {/** Actions */}
+                <td className="px-6 py-4">
+                  <div className="flex items-center justify-end gap-1">
+                    {/** Refresh button */}
                     <button
-                      onClick={() => ztteam_handleOpenPage(ztteam_page)}
-                      className="text-slate-400 hover:text-primary transition-colors"
+                      onClick={() => handleRefresh(fanpage.id)}
+                      disabled={ztteam_refreshingId === fanpage.id}
+                      className="p-2 rounded-lg text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+                      title="Refresh page info"
                     >
-                      <span className="material-symbols-outlined text-xl">visibility</span>
+                      <span
+                        className={`material-symbols-outlined text-lg ${
+                          ztteam_refreshingId === fanpage.id
+                            ? "animate-spin"
+                            : ""
+                        }`}
+                      >
+                        sync
+                      </span>
                     </button>
-                    <button onClick={() => ztteam_onDelete(ztteam_page.id)} className="text-slate-400 hover:text-rose-500 transition-colors">
-                      <span className="material-symbols-outlined text-xl">delete</span>
+
+                    {/** View button */}
+                    <button
+                      onClick={() => ztteam_handleOpenPage(fanpage)}
+                      className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                      title="Open Facebook page"
+                    >
+                      <span className="material-symbols-outlined text-lg">
+                        visibility
+                      </span>
                     </button>
-                  </td>
-                </tr>
-              ))
-            )}
+
+                    {/** Delete button */}
+                    <button
+                      onClick={() => ztteam_onDelete(fanpage.id)}
+                      className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                      title="Delete fanpage"
+                    >
+                      <span className="material-symbols-outlined text-lg">
+                        delete
+                      </span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
 
-      {/** Mobile: Card view */}
-      <div className="sm:hidden divide-y divide-slate-200 dark:divide-slate-800">
-        {ztteam_loading ? (
-          <div className="px-4 py-12 text-center text-slate-500">
-            <span className="material-symbols-outlined animate-spin text-3xl text-primary">progress_activity</span>
-            <p className="mt-2 text-sm">Loading fanpages...</p>
-          </div>
-        ) : ztteam_fanpages.length === 0 ? (
-          <div className="px-4 py-12 text-center text-slate-500">
-            <span className="material-symbols-outlined text-4xl text-slate-300 dark:text-slate-600">flag</span>
-            <p className="mt-2 text-sm">No fanpages yet. Tap &quot;New Fanpage&quot; to add one.</p>
-          </div>
-        ) : (
-          ztteam_fanpages.map((ztteam_page) => (
-            <div key={ztteam_page.id} className="p-4 space-y-3">
-              <div className="flex items-center gap-3">
-                {ztteam_page.imageUrl ? (
-                  <img
-                    src={ztteam_page.imageUrl}
-                    alt={ztteam_page.name}
-                    className="size-12 rounded-lg object-cover border border-slate-200 dark:border-slate-700"
-                  />
-                ) : (
-                  <div className="size-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-primary">flag</span>
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold truncate">{ztteam_page.name}</p>
-                  <p className="text-xs text-slate-500 truncate">{ztteam_page.url}</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] font-bold uppercase tracking-wider">
-                    {ztteam_page.category || "Uncategorized"}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <span className={`size-2 rounded-full ${ztteam_page.status === "active" ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`}></span>
-                    <span className={`text-xs font-medium ${ztteam_page.status === "active" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-500 dark:text-slate-400"}`}>
-                      {ztteam_page.status === "active" ? "Active" : "Inactive"}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => ztteam_handleOpenPage(ztteam_page)}
-                    className="size-9 flex items-center justify-center rounded-lg text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-xl">visibility</span>
-                  </button>
-                  <button onClick={() => ztteam_onDelete(ztteam_page.id)} className="size-9 flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
-                    <span className="material-symbols-outlined text-xl">delete</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+      {/** === MOBILE CARDS === */}
+      <div className="sm:hidden space-y-3">
+        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 px-1">
+          Recent Fanpages
+        </h3>
 
-      <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-        <p className="text-xs sm:text-sm text-slate-500">
-          Showing {ztteam_fanpages.length} {ztteam_fanpages.length === 1 ? "entry" : "entries"}
-        </p>
+        {ztteam_fanpages.map((fanpage) => (
+          <div
+            key={fanpage.id}
+            className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm"
+          >
+            {/** Header */}
+            <div className="flex items-center gap-3 mb-3">
+              {fanpage.imageUrl ? (
+                <img
+                  src={fanpage.imageUrl}
+                  alt={fanpage.name}
+                  className="w-12 h-12 rounded-full object-cover ring-2 ring-slate-100 dark:ring-slate-600"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-primary">
+                    language
+                  </span>
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">
+                  {fanpage.name}
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 truncate">
+                  {fanpage.url}
+                </p>
+              </div>
+              <span
+                className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                  fanpage.status === "active"
+                    ? "bg-emerald-500"
+                    : "bg-slate-400"
+                }`}
+              ></span>
+            </div>
+
+            {/** Page ID */}
+            {fanpage.pageId && (
+              <p className="text-xs text-slate-400 dark:text-slate-500 font-mono mb-3">
+                ID: {fanpage.pageId}
+              </p>
+            )}
+
+            {/** Actions */}
+            <div className="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-700">
+              {/** Refresh */}
+              <button
+                onClick={() => handleRefresh(fanpage.id)}
+                disabled={ztteam_refreshingId === fanpage.id}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium text-blue-500 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+              >
+                <span
+                  className={`material-symbols-outlined text-base ${
+                    ztteam_refreshingId === fanpage.id ? "animate-spin" : ""
+                  }`}
+                >
+                  sync
+                </span>
+                Refresh
+              </button>
+
+              {/** View */}
+              <button
+                onClick={() => ztteam_handleOpenPage(fanpage)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+              >
+                <span className="material-symbols-outlined text-base">
+                  visibility
+                </span>
+                View
+              </button>
+
+              {/** Delete */}
+              <button
+                onClick={() => ztteam_onDelete(fanpage.id)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium text-red-500 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors"
+              >
+                <span className="material-symbols-outlined text-base">
+                  delete
+                </span>
+                Delete
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
-    </div>
+    </>
   );
 }
