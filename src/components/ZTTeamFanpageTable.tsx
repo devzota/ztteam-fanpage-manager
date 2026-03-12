@@ -10,53 +10,26 @@ interface ZTTeamFanpageTableProps {
   ztteam_onRefresh: (id: string) => Promise<boolean>;
 }
 
-/** Detect mobile device */
-function ztteam_isMobile(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-    navigator.userAgent,
-  );
-}
-
-/** Mở Facebook page - xử lý deep link cho mobile */
+/**
+ * Mở Facebook page
+ * iPhone: dùng universal link https://www.facebook.com/ → iOS tự mở app FB nếu có cài
+ * Desktop: mở tab mới
+ */
 function ztteam_handleOpenPage(fanpage: ZTTeamFanpage) {
-  const mobile = ztteam_isMobile();
+  /**
+   * Trên iPhone, Safari tự detect universal link của Facebook
+   * Chỉ cần dùng window.location.href thay vì window.open
+   * Safari sẽ tự mở app FB nếu đã cài, nếu không thì mở web
+   */
+  const isMobile =
+    typeof navigator !== "undefined" &&
+    /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-  if (mobile && fanpage.pageId) {
-    /**
-     * Trên mobile: dùng thẻ <a> ẩn với deep link
-     * Click programmatically - an toàn, không đóng tab
-     */
-    const fbAppUrl = `fb://page/${fanpage.pageId}`;
-    const link = document.createElement("a");
-    link.href = fbAppUrl;
-    link.style.display = "none";
-    document.body.appendChild(link);
-    link.click();
-
-    /**
-     * Fallback: nếu sau 1.5s vẫn ở trang hiện tại
-     * (app FB không bắt được) → mở URL bình thường
-     */
-    const fallbackTimer = setTimeout(() => {
-      window.location.href = fanpage.url;
-    }, 1500);
-
-    /** Nếu page bị blur (app FB đã mở) → clear fallback */
-    const handleBlur = () => {
-      clearTimeout(fallbackTimer);
-      window.removeEventListener("blur", handleBlur);
-    };
-    window.addEventListener("blur", handleBlur);
-
-    /** Cleanup link element */
-    setTimeout(() => {
-      if (link.parentNode) {
-        document.body.removeChild(link);
-      }
-    }, 100);
+  if (isMobile) {
+    /** Dùng location.href — iOS universal link sẽ tự bắt và mở app FB */
+    window.location.href = fanpage.url;
   } else {
-    /** Desktop hoặc không có pageId: mở tab mới */
+    /** Desktop: mở tab mới */
     window.open(fanpage.url, "_blank", "noopener,noreferrer");
   }
 }
@@ -123,7 +96,7 @@ export default function ZTTeamFanpageTable({
           <thead>
             <tr className="text-left text-sm text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-700">
               <th className="px-6 py-3 font-medium">Page Name</th>
-              <th className="px-6 py-3 font-medium">Page ID</th>
+              <th className="px-6 py-3 font-medium">URL</th>
               <th className="px-6 py-3 font-medium">Status</th>
               <th className="px-6 py-3 font-medium text-right">Actions</th>
             </tr>
@@ -150,22 +123,17 @@ export default function ZTTeamFanpageTable({
                         </span>
                       </div>
                     )}
-                    <div>
-                      <p className="font-medium text-slate-800 dark:text-slate-100">
-                        {fanpage.name}
-                      </p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[200px]">
-                        {fanpage.url}
-                      </p>
-                    </div>
+                    <p className="font-medium text-slate-800 dark:text-slate-100">
+                      {fanpage.name}
+                    </p>
                   </div>
                 </td>
 
-                {/** Page ID */}
+                {/** URL */}
                 <td className="px-6 py-4">
-                  <span className="text-sm text-slate-500 dark:text-slate-400 font-mono">
-                    {fanpage.pageId || "N/A"}
-                  </span>
+                  <p className="text-sm text-slate-400 dark:text-slate-500 truncate max-w-[250px]">
+                    {fanpage.url}
+                  </p>
                 </td>
 
                 {/** Status */}
@@ -191,7 +159,7 @@ export default function ZTTeamFanpageTable({
                 {/** Actions */}
                 <td className="px-6 py-4">
                   <div className="flex items-center justify-end gap-1">
-                    {/** Refresh button */}
+                    {/** Refresh */}
                     <button
                       onClick={() => handleRefresh(fanpage.id)}
                       disabled={ztteam_refreshingId === fanpage.id}
@@ -209,7 +177,7 @@ export default function ZTTeamFanpageTable({
                       </span>
                     </button>
 
-                    {/** View button */}
+                    {/** View */}
                     <button
                       onClick={() => ztteam_handleOpenPage(fanpage)}
                       className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
@@ -220,7 +188,7 @@ export default function ZTTeamFanpageTable({
                       </span>
                     </button>
 
-                    {/** Delete button */}
+                    {/** Delete */}
                     <button
                       onClick={() => ztteam_onDelete(fanpage.id)}
                       className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
@@ -281,13 +249,6 @@ export default function ZTTeamFanpageTable({
               ></span>
             </div>
 
-            {/** Page ID */}
-            {fanpage.pageId && (
-              <p className="text-xs text-slate-400 dark:text-slate-500 font-mono mb-3">
-                ID: {fanpage.pageId}
-              </p>
-            )}
-
             {/** Actions */}
             <div className="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-700">
               {/** Refresh */}
@@ -306,16 +267,18 @@ export default function ZTTeamFanpageTable({
                 Refresh
               </button>
 
-              {/** View */}
-              <button
-                onClick={() => ztteam_handleOpenPage(fanpage)}
+              {/** View — dùng thẻ <a> thay vì button để iOS handle universal link */}
+              <a
+                href={fanpage.url}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
               >
                 <span className="material-symbols-outlined text-base">
                   visibility
                 </span>
                 View
-              </button>
+              </a>
 
               {/** Delete */}
               <button
